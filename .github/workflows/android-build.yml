@@ -7,6 +7,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,6 +17,22 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Check Android project
+        run: |
+          echo "Checking project files..."
+          find . -maxdepth 4 -type f \( \
+            -name "settings.gradle" -o \
+            -name "settings.gradle.kts" -o \
+            -name "build.gradle" -o \
+            -name "build.gradle.kts" -o \
+            -name "gradlew" \
+          \) -print
+
+          if [ ! -d "app" ]; then
+            echo "ERROR: app folder not found at repository root."
+            exit 1
+          fi
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -25,11 +44,21 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build APK
-        run: gradle assembleDebug
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug
+          elif [ -f "./gradle/wrapper/gradle-wrapper.properties" ]; then
+            gradle assembleDebug
+          else
+            gradle assembleDebug
+          fi
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: MotionStudio-AI-APK
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
           
